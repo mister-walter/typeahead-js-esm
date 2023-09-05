@@ -6,11 +6,47 @@
 
 // inspired by https://github.com/jharding/lru-cache
 
-var LruCache = (function() {
-  'use strict';
+import { isNumber } from "../common/utils";
 
-  function LruCache(maxSize) {
-    this.maxSize = _.isNumber(maxSize) ? maxSize : 100;
+class Node {
+  constructor(key, val) {
+    this.key = key;
+    this.val = val;
+    this.prev = null;
+    this.next = null;
+  }
+}
+
+class List {
+  constructor() {
+    this.head = null;
+    this.tail = null;
+  }
+
+  add(node) {
+    if (this.head) {
+      node.next = this.head;
+      this.head.prev = node;
+    }
+
+    this.head = node;
+    this.tail = this.tail || node;
+  }
+
+  remove(node) {
+    node.prev ? node.prev.next = node.next : this.head = node.next;
+    node.next ? node.next.prev = node.prev : this.tail = node.prev;
+  }
+
+  moveToFront(node) {
+    this.remove(node);
+    this.add(node);
+  }
+}
+
+class LruCache {
+  constructor(maxSize) {
+    this.maxSize = isNumber(maxSize) ? maxSize : 100;
     this.reset();
 
     // if max size is less than 0, provide a noop cache
@@ -19,83 +55,49 @@ var LruCache = (function() {
     }
   }
 
-  _.mixin(LruCache.prototype, {
-    set: function set(key, val) {
-      var tailItem = this.list.tail, node;
+  set(key, val) {
+    const tailItem = this.list.tail;
+    let node;
 
-      // at capacity
-      if (this.size >= this.maxSize) {
-        this.list.remove(tailItem);
-        delete this.hash[tailItem.key];
+    // at capacity
+    if (this.size >= this.maxSize) {
+      this.list.remove(tailItem);
+      delete this.hash[tailItem.key];
 
-        this.size--;
-      }
-
-      // writing over existing key
-      if (node = this.hash[key]) {
-        node.val = val;
-        this.list.moveToFront(node);
-      }
-
-      // new key
-      else {
-        node = new Node(key, val);
-
-        this.list.add(node);
-        this.hash[key] = node;
-
-        this.size++;
-      }
-    },
-
-    get: function get(key) {
-      var node = this.hash[key];
-
-      if (node) {
-        this.list.moveToFront(node);
-        return node.val;
-      }
-    },
-
-    reset: function reset() {
-      this.size = 0;
-      this.hash = {};
-      this.list = new List();
+      this.size--;
     }
-  });
 
-  function List() {
-    this.head = this.tail = null;
+    // writing over existing key
+    if (node = this.hash[key]) {
+      node.val = val;
+      this.list.moveToFront(node);
+    }
+
+    // new key
+    else {
+      node = new Node(key, val);
+
+      this.list.add(node);
+      this.hash[key] = node;
+
+      this.size++;
+    }
   }
 
-  _.mixin(List.prototype, {
-    add: function add(node) {
-      if (this.head) {
-        node.next = this.head;
-        this.head.prev = node;
-      }
+  get(key) {
+    const node = this.hash[key];
 
-      this.head = node;
-      this.tail = this.tail || node;
-    },
-
-    remove: function remove(node) {
-      node.prev ? node.prev.next = node.next : this.head = node.next;
-      node.next ? node.next.prev = node.prev : this.tail = node.prev;
-    },
-
-    moveToFront: function(node) {
-      this.remove(node);
-      this.add(node);
+    if (node) {
+      this.list.moveToFront(node);
+      return node.val;
     }
-  });
-
-  function Node(key, val) {
-    this.key = key;
-    this.val = val;
-    this.prev = this.next = null;
   }
 
-  return LruCache;
+  reset() {
+    this.size = 0;
+    this.hash = {};
+    this.list = new List();
+  }
+}
 
-})();
+export { LruCache };

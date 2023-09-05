@@ -4,61 +4,55 @@
  * Copyright 2013-2014 Twitter, Inc. and other contributors; Licensed MIT
  */
 
-var tokenizers = (function() {
-  'use strict';
 
-  return {
-    nonword: nonword,
-    whitespace: whitespace,
-    ngram: ngram,
-    obj: {
-      nonword: getObjTokenizer(nonword),
-      whitespace: getObjTokenizer(whitespace),
-      ngram: getObjTokenizer(ngram)
+function whitespace(str) {
+  const str = _.toStr(str);
+  return str ? str.split(/\s+/) : [];
+}
+
+function nonword(str) {
+  const str = _.toStr(str);
+  return str ? str.split(/\W+/) : [];
+}
+
+function ngram(str) {
+  const str = _.toStr(str);
+
+  const tokens = [];
+  let word = '';
+
+  for(const char of str.split('')) {
+    if (char.match(/\s+/)) {
+      word = '';
+    } else {
+      tokens.push(word + char);
+      word += char;
     }
-  };
-
-  function whitespace(str) {
-    str = _.toStr(str);
-    return str ? str.split(/\s+/) : [];
   }
 
-  function nonword(str) {
-    str = _.toStr(str);
-    return str ? str.split(/\W+/) : [];
-  }
+  return tokens;
+}
 
-  function ngram(str) {
-    str = _.toStr(str);
+function getObjTokenizer(tokenizer) {
+  return function setKey(keys) {
+    const keys = _.isArray(keys) ? keys : [].slice.call(arguments, 0);
 
-    var tokens = [],
-        word = '';
+    return function tokenize(o) {
+      let tokens = [];
 
-    _.each(str.split(''), function(char) {
-      if (char.match(/\s+/)) {
-        word = '';
-      } else {
-        tokens.push(word+char);
-        word += char;
+      for(const k of keys) {
+        tokens = tokens.concat(tokenizer(_.toStr(o[k])));
       }
-    });
 
-    return tokens;
-  }
-
-  function getObjTokenizer(tokenizer) {
-    return function setKey(keys) {
-      keys = _.isArray(keys) ? keys : [].slice.call(arguments, 0);
-
-      return function tokenize(o) {
-        var tokens = [];
-
-        _.each(keys, function(k) {
-          tokens = tokens.concat(tokenizer(_.toStr(o[k])));
-        });
-
-        return tokens;
-      };
+      return tokens;
     };
-  }
-})();
+  };
+}
+
+const tokenizers = {
+  nonword: getObjTokenizer(nonword),
+  whitespace: getObjTokenizer(whitespace),
+  ngram: getObjTokenizer(ngram)
+};
+
+export { tokenizers };

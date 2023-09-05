@@ -4,15 +4,75 @@
  * Copyright 2013-2014 Twitter, Inc. and other contributors; Licensed MIT
  */
 
-var SearchIndex = window.SearchIndex = (function() {
-  'use strict';
+// helper functions
+// ----------------
 
-  var CHILDREN = 'c', IDS = 'i';
+function normalizeTokens(tokens) {
+  // filter out falsy tokens
+  const tokens = tokens.filter(token => !!token);
 
-  // constructor
-  // -----------
+  // normalize tokens
+  return tokens.map(token => token.toLowerCase());
+}
 
-  function SearchIndex(o) {
+function newNode() {
+  const node = {};
+
+  node[IDS] = [];
+  node[CHILDREN] = {};
+
+  return node;
+}
+
+function unique(array) {
+  const seen = new Set();
+  const uniques = [];
+
+  for (const elt of array) {
+    if (!seen.has(elt)) {
+      seen.add(elt);
+      uniques.push(elt);
+    }
+  }
+
+  return uniques;
+}
+
+function getIntersection(arrayA, arrayB) {
+  let ai = 0;
+  let bi = 0;
+  const intersection = [];
+
+  arrayA = arrayA.sort();
+  arrayB = arrayB.sort();
+
+  const lenArrayA = arrayA.length;
+  const lenArrayB = arrayB.length;
+
+  while (ai < lenArrayA && bi < lenArrayB) {
+    if (arrayA[ai] < arrayB[bi]) {
+      ai++;
+    }
+
+    else if (arrayA[ai] > arrayB[bi]) {
+      bi++;
+    }
+
+    else {
+      intersection.push(arrayA[ai]);
+      ai++;
+      bi++;
+    }
+  }
+
+  return intersection;
+}
+
+class SearchIndex {
+  CHILDREN = 'c';
+  IDS = 'i';
+
+  constructor(o) {
     o = o || {};
 
     if (!o.datumTokenizer || !o.queryTokenizer) {
@@ -27,168 +87,92 @@ var SearchIndex = window.SearchIndex = (function() {
     this.reset();
   }
 
-  // instance methods
-  // ----------------
+  bootstrap(o) {
+    this.datums = o.datums;
+    this.trie = o.trie;
+  }
 
-  _.mixin(SearchIndex.prototype, {
+  add(data) {
+    const data = _.isArray(data) ? data : [data];
 
-    // ### public
+    for(const datum of data) {
+      const id = this.identify(datum);
+      const tokens = normalizeTokens(this.datumTokenizer(datum));
 
-    bootstrap: function bootstrap(o) {
-      this.datums = o.datums;
-      this.trie = o.trie;
-    },
+      this.datums[id] = datum;
 
-    add: function(data) {
-      var that = this;
+      for(const token of tokens) {
+        let node = this.trie;
+        const chars = token.split('');
+        let ch;
 
-      data = _.isArray(data) ? data : [data];
+        while (ch = chars.shift()) {
+          node = node[CHILDREN][ch] || (node[CHILDREN][ch] = newNode());
+          node[IDS].push(id);
+        }
+      }
+    }
+  }
 
-      _.each(data, function(datum) {
-        var id, tokens;
+  get(ids) {
+    return ids.map(id => this.datums[id]);
+  }
 
-        that.datums[id = that.identify(datum)] = datum;
-        tokens = normalizeTokens(that.datumTokenizer(datum));
+  search(query) {
+    const tokens = normalizeTokens(this.queryTokenizer(query));
+    let matches;
 
-        _.each(tokens, function(token) {
-          var node, chars, ch;
+    for(const token of tokens) {
+      let node, chars, ch, ids;
 
-          node = that.trie;
-          chars = token.split('');
+      // previous tokens didn't share any matches
+      if (matches && matches.length === 0 && !this.matchAnyQueryToken) {
+        return false;
+      }
 
-          while (ch = chars.shift()) {
-            node = node[CHILDREN][ch] || (node[CHILDREN][ch] = newNode());
-            node[IDS].push(id);
-          }
-        });
-      });
-    },
+      node = this.trie;
+      chars = token.split('');
 
-    get: function get(ids) {
-      var that = this;
+      while (node && (ch = chars.shift())) {
+        node = node[CHILDREN][ch];
+      }
 
-      return _.map(ids, function(id) { return that.datums[id]; });
-    },
+      if (node && chars.length === 0) {
+        ids = node[IDS].slice(0);
+        matches = matches ? getIntersection(matches, ids) : ids;
+      }
 
-    search: function search(query) {
-      var that = this, tokens, matches;
-
-      tokens = normalizeTokens(this.queryTokenizer(query));
-
-      _.each(tokens, function(token) {
-        var node, chars, ch, ids;
-
-        // previous tokens didn't share any matches
-        if (matches && matches.length === 0 && !that.matchAnyQueryToken) {
+      // break early if we find out there are no possible matches
+      else {
+        if (!this.matchAnyQueryToken) {
+          matches = [];
           return false;
         }
-
-        node = that.trie;
-        chars = token.split('');
-
-        while (node && (ch = chars.shift())) {
-          node = node[CHILDREN][ch];
-        }
-
-        if (node && chars.length === 0) {
-          ids = node[IDS].slice(0);
-          matches = matches ? getIntersection(matches, ids) : ids;
-        }
-
-        // break early if we find out there are no possible matches
-        else {
-          if (!that.matchAnyQueryToken) {
-            matches = [];
-            return false;
-          }
-        }
-      });
-
-      return matches ?
-        _.map(unique(matches), function(id) { return that.datums[id]; }) : [];
-    },
-
-    all: function all() {
-      var values = [];
-
-      for (var key in this.datums) {
-        values.push(this.datums[key]);
-      }
-
-      return values;
-    },
-
-    reset: function reset() {
-      this.datums = {};
-      this.trie = newNode();
-    },
-
-    serialize: function serialize() {
-      return { datums: this.datums, trie: this.trie };
-    }
-  });
-
-  return SearchIndex;
-
-  // helper functions
-  // ----------------
-
-  function normalizeTokens(tokens) {
-   // filter out falsy tokens
-    tokens = _.filter(tokens, function(token) { return !!token; });
-
-    // normalize tokens
-    tokens = _.map(tokens, function(token) { return token.toLowerCase(); });
-
-    return tokens;
-  }
-
-  function newNode() {
-    var node = {};
-
-    node[IDS] = [];
-    node[CHILDREN] = {};
-
-    return node;
-  }
-
-  function unique(array) {
-    var seen = {}, uniques = [];
-
-    for (var i = 0, len = array.length; i < len; i++) {
-      if (!seen[array[i]]) {
-        seen[array[i]] = true;
-        uniques.push(array[i]);
       }
     }
 
-    return uniques;
+    return matches ?
+      _.map(unique(matches), (id) => this.datums[id]) : [];
   }
 
-  function getIntersection(arrayA, arrayB) {
-    var ai = 0, bi = 0, intersection = [];
+  all() {
+    const values = [];
 
-    arrayA = arrayA.sort();
-    arrayB = arrayB.sort();
-
-    var lenArrayA = arrayA.length, lenArrayB = arrayB.length;
-
-    while (ai < lenArrayA && bi < lenArrayB) {
-      if (arrayA[ai] < arrayB[bi]) {
-        ai++;
-      }
-
-      else if (arrayA[ai] > arrayB[bi]) {
-        bi++;
-      }
-
-      else {
-        intersection.push(arrayA[ai]);
-        ai++;
-        bi++;
-      }
+    for (const key in this.datums) {
+      values.push(this.datums[key]);
     }
 
-    return intersection;
+    return values;
   }
-})();
+
+  reset() {
+    this.datums = {};
+    this.trie = newNode();
+  }
+
+  serialize() {
+    return { datums: this.datums, trie: this.trie };
+  }
+}
+
+export { SearchIndex };

@@ -4,169 +4,165 @@
  * Copyright 2013-2014 Twitter, Inc. and other contributors; Licensed MIT
  */
 
-var _ = (function() {
-  'use strict';
+function isMsie() {
+  // from https://github.com/ded/bowser/blob/master/bowser.js
+  return (/(msie|trident)/i).test(navigator.userAgent) ?
+    navigator.userAgent.match(/(msie |rv:)(\d+(.\d+)?)/i)[2] : false;
+}
 
-  return {
-    isMsie: function() {
-      // from https://github.com/ded/bowser/blob/master/bowser.js
-      return (/(msie|trident)/i).test(navigator.userAgent) ?
-        navigator.userAgent.match(/(msie |rv:)(\d+(.\d+)?)/i)[2] : false;
-    },
+function isBlankString(str) { return !str || /^\s*$/.test(str); }
 
-    isBlankString: function(str) { return !str || /^\s*$/.test(str); },
+// http://stackoverflow.com/a/6969486
+function escapeRegExChars(str) {
+  return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&');
+}
 
-    // http://stackoverflow.com/a/6969486
-    escapeRegExChars: function(str) {
-      return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&');
-    },
+function isString(obj) { return typeof obj === 'string'; }
 
-    isString: function(obj) { return typeof obj === 'string'; },
+function isNumber(obj) { return typeof obj === 'number'; }
 
-    isNumber: function(obj) { return typeof obj === 'number'; },
+function isArray(obj) { }
 
-    isArray: $.isArray,
+function isFunction(obj) { }
 
-    isFunction: $.isFunction,
+function isObject(obj) { }
 
-    isObject: $.isPlainObject,
+function isUndefined(obj) { return typeof obj === 'undefined'; }
 
-    isUndefined: function(obj) { return typeof obj === 'undefined'; },
+function isElement(obj) { return !!(obj && obj.nodeType === 1); }
 
-    isElement: function(obj) { return !!(obj && obj.nodeType === 1); },
+function isJQuery(obj) { return obj instanceof $; }
 
-    isJQuery: function(obj) { return obj instanceof $; },
+function toStr(s) {
+  return (_.isUndefined(s) || s === null) ? '' : s + '';
+}
 
-    toStr: function toStr(s) {
-      return (_.isUndefined(s) || s === null) ? '' : s + '';
-    },
+function bind() { }
 
-    bind: $.proxy,
+// function each(collection, cb) {
+//   // stupid argument order for jQuery.each
+//   $.each(collection, reverseArgs);
 
-    each: function(collection, cb) {
-      // stupid argument order for jQuery.each
-      $.each(collection, reverseArgs);
+//   function reverseArgs(index, value) { return cb(value, index); }
+// }
 
-      function reverseArgs(index, value) { return cb(value, index); }
-    },
+// function map() { }
 
-    map: $.map,
+// function filter() { }
 
-    filter: $.grep,
+// function every(obj, test) {
+//   var result = true;
 
-    every: function(obj, test) {
-      var result = true;
+//   if (!obj) { return result; }
 
-      if (!obj) { return result; }
+//   $.each(obj, function (key, val) {
+//     if (!(result = test.call(null, val, key, obj))) {
+//       return false;
+//     }
+//   });
 
-      $.each(obj, function(key, val) {
-        if (!(result = test.call(null, val, key, obj))) {
-          return false;
-        }
-      });
+//   return !!result;
+// }
 
-      return !!result;
-    },
+// function some(obj, test) {
+//   var result = false;
 
-    some: function(obj, test) {
-      var result = false;
+//   if (!obj) { return result; }
 
-      if (!obj) { return result; }
+//   $.each(obj, function (key, val) {
+//     if (result = test.call(null, val, key, obj)) {
+//       return false;
+//     }
+//   });
 
-      $.each(obj, function(key, val) {
-        if (result = test.call(null, val, key, obj)) {
-          return false;
-        }
-      });
+//   return !!result;
+// }
 
-      return !!result;
-    },
+function mixin() { }
 
-    mixin: $.extend,
+function identity(x) { return x; }
 
-    identity: function(x) { return x; },
+function clone(obj) { return $.extend(true, {}, obj); }
 
-    clone: function(obj) { return $.extend(true, {}, obj); },
+function getIdGenerator() {
+  var counter = 0;
+  return function () { return counter++; };
+}
 
-    getIdGenerator: function() {
-      var counter = 0;
-      return function() { return counter++; };
-    },
+function templatify(obj) {
+  return $.isFunction(obj) ? obj : template;
 
-    templatify: function templatify(obj) {
-      return $.isFunction(obj) ? obj : template;
+  function template() { return String(obj); }
+}
 
-      function template() { return String(obj); }
-    },
+function defer(fn) { setTimeout(fn, 0); }
 
-    defer: function(fn) { setTimeout(fn, 0); },
+function debounce(func, wait, immediate) {
+  var timeout, result;
 
-    debounce: function(func, wait, immediate) {
-      var timeout, result;
+  return function () {
+    var context = this, args = arguments, later, callNow;
 
-      return function() {
-        var context = this, args = arguments, later, callNow;
+    later = function () {
+      timeout = null;
+      if (!immediate) { result = func.apply(context, args); }
+    };
 
-        later = function() {
-          timeout = null;
-          if (!immediate) { result = func.apply(context, args); }
-        };
+    callNow = immediate && !timeout;
 
-        callNow = immediate && !timeout;
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
 
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
+    if (callNow) { result = func.apply(context, args); }
 
-        if (callNow) { result = func.apply(context, args); }
-
-        return result;
-      };
-    },
-
-    throttle: function(func, wait) {
-      var context, args, timeout, result, previous, later;
-
-      previous = 0;
-      later = function() {
-        previous = new Date();
-        timeout = null;
-        result = func.apply(context, args);
-      };
-
-      return function() {
-        var now = new Date(),
-            remaining = wait - (now - previous);
-
-        context = this;
-        args = arguments;
-
-        if (remaining <= 0) {
-          clearTimeout(timeout);
-          timeout = null;
-          previous = now;
-          result = func.apply(context, args);
-        }
-
-        else if (!timeout) {
-          timeout = setTimeout(later, remaining);
-        }
-
-        return result;
-      };
-    },
-
-    stringify: function(val) {
-      return _.isString(val) ? val : JSON.stringify(val);
-    },
-
-    guid: function() {
-      function _p8(s) {
-        var p = (Math.random().toString(16)+'000000000').substr(2,8);
-        return s ? '-' + p.substr(0,4) + '-' + p.substr(4,4) : p ;
-      }
-      return 'tt-' + _p8() + _p8(true) + _p8(true) + _p8();
-    },
-
-    noop: function() {}
+    return result;
   };
-})();
+}
+
+function throttle(func, wait) {
+  var context, args, timeout, result, previous, later;
+
+  previous = 0;
+  later = function () {
+    previous = new Date();
+    timeout = null;
+    result = func.apply(context, args);
+  };
+
+  return function () {
+    var now = new Date(),
+      remaining = wait - (now - previous);
+
+    context = this;
+    args = arguments;
+
+    if (remaining <= 0) {
+      clearTimeout(timeout);
+      timeout = null;
+      previous = now;
+      result = func.apply(context, args);
+    }
+
+    else if (!timeout) {
+      timeout = setTimeout(later, remaining);
+    }
+
+    return result;
+  };
+}
+
+function stringify(val) {
+  return _.isString(val) ? val : JSON.stringify(val);
+}
+
+function guid() {
+  function _p8(s) {
+    const p = (Math.random().toString(16) + '000000000').slice(2, 8);
+    return s ? '-' + p.slice(0, 4) + '-' + p.slice(4, 4) : p;
+  }
+  return 'tt-' + _p8() + _p8(true) + _p8(true) + _p8();
+}
+
+function noop() { }
+
+export { isNumber, isFunction, mixin, noop, identity, debounce, throttle, stringify, guid, defer, templatify, clone }

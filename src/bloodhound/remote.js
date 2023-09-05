@@ -4,13 +4,8 @@
  * Copyright 2013-2014 Twitter, Inc. and other contributors; Licensed MIT
  */
 
-var Remote = (function() {
-  'use strict';
-
-  // constructor
-  // -----------
-
-  function Remote(o) {
+class Remote {
+  constructor(o) {
     this.url = o.url;
     this.prepare = o.prepare;
     this.transform = o.transform;
@@ -24,37 +19,28 @@ var Remote = (function() {
     });
   }
 
-  // instance methods
-  // ----------------
+  #settings() {
+    return { url: this.url, type: 'GET', dataType: 'json' };
+  }
 
-  _.mixin(Remote.prototype, {
-    // ### private
+  get(query, cb) {
+    if (!cb) { return; }
 
-    _settings: function settings() {
-      return { url: this.url, type: 'GET', dataType: 'json' };
-    },
+    const query = query || '';
+    const settings = this.prepare(query, this.#settings());
 
-    // ### public
-
-    get: function get(query, cb) {
-      var that = this, settings;
-
-      if (!cb) { return; }
-
-      query = query || '';
-      settings = this.prepare(query, this._settings());
-
-      return this.transport.get(settings, onResponse);
-
-      function onResponse(err, resp) {
-        err ? cb([]) : cb(that.transform(resp));
+    return this.transport.get(settings, (err, resp) => {
+      if(err) {
+        cb([])
+      } else {
+        cb(this.transform(resp));
       }
-    },
+    });
+  }
 
-    cancelLastRequest: function cancelLastRequest() {
-      this.transport.cancel();
-    }
-  });
+  cancelLastRequest() {
+    this.transport.cancel();
+  }
+}
 
-  return Remote;
-})();
+export { Remote };

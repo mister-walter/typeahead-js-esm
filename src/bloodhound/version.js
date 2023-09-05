@@ -4,4 +4,6 @@
  * Copyright 2013-2014 Twitter, Inc. and other contributors; Licensed MIT
  */
 
-var VERSION = '%VERSION%';
+const VERSION = '%VERSION%';
+
+export { VERSION };
